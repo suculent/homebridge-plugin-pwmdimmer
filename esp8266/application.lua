@@ -54,11 +54,7 @@ function mq(target)
     end)
 
     m:on("message", function(client, topic, data) 
-        -- if data ~= nil then print("message: " .. data)
-            if data then
-                fadeToPercent(data)
-            end
-        end
+        if data ~= nil then fadeToPercent(data) end
     end)
 
     print("Connecting to MQTT to " .. target .. "...")
@@ -67,16 +63,7 @@ function mq(target)
         print(":mconnected") 
         m:subscribe("/dimmer/brightness",0, function(client) print("subscribe success") end)
         local initial_state = tonumber(getBrightness())
-        m:publish("/dimmer",initial_state,0,0)
-        local counter = 0
-        local last_state = intial_state
-        -- reporting every 30 secs
-        tmr.alarm(1, 30000, 1, function()
-            local current = tonumber(getBrightness())            
-            m:publish("/dimmer",current,0,0)                
-            current_state = current
-            collectgarbage()
-        end)        
+        m:publish("/dimmer",initial_state,0,0)  
     end,     
     function(client, reason)
         print("failed reason: "..reason)
@@ -109,10 +96,11 @@ function fadeToPercent(percent)
     end
 
     while continue do
-        tmr.delay(10)
+        tmr.delay(100)
         pwm.setup(pin, clock, duty)
         pwm.start(pin)    
         duty = duty + direction               
+        -- print(duty) -- causes significant delay
         if duty == targetDuty then
             currentPercent = percent                      
             continue = false
