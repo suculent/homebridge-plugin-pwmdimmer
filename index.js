@@ -14,7 +14,7 @@ var default_mqtt_channel = "/dimmer"
 var mqtt = require('mqtt')
 var mqttClient = null; // will be non-null if working
 
-var brightness = 0;
+
 
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
@@ -30,9 +30,14 @@ function Dimmer(log, config) {
     this.mqttBroker = config['mqtt_broker'];
     this.mqttChannel = config['mqtt_channel'];
 
+    this.brightness = 0;
+
     if (!this.mqttBroker) {
-        this.log.warn('Config is missing mqtt_broker, fallback to default.');
+        this.log.warn('Config is missing mqtt_broker, fallback to default.');        
         this.mqttBroker = default_broker_address;
+        if (!this.mqttBroker.contains("mqtt://")) {
+            this.mqttBroker = "mqtt://" + this.mqttBroker;
+        }
     }
 
     if (!this.mqttChannel) {
@@ -43,7 +48,7 @@ function Dimmer(log, config) {
     init_mqtt(this.mqttBroker, this.mqttChannel);
 }
 
-Dimmer.prototype.init_mqtt(broker_address, channel) {   
+function init_mqtt(broker_address, channel) {
     console.log("Connecting to mqtt broker: " + broker_address)
     mqttClient = mqtt.connect(broker_address)
 
@@ -59,9 +64,9 @@ Dimmer.prototype.init_mqtt(broker_address, channel) {
 
       var pin = 0
 
-      if (topic == (mqtt_channel + "/dimmer")) {
+      if (topic == channel) {
         this.state = message;
-        brightness = parseInt(message)
+        this.brightness = parseInt(message)
             
         this.getServices[0]
         .getCharacteristic(Characteristic.ContactSensorState)
@@ -74,24 +79,35 @@ Dimmer.prototype.init_mqtt(broker_address, channel) {
 
 Dimmer.prototype.setBrightness = function(level, callback) {
 
-    var newVolume = level;
-
-    if(level > this.maxVolume){
+    if(level > this.maxBrightness){
         //enforce maximum volume
-        newVolume = this.maxVolume;
-        this.log('Volume %s capped to max volume %s on %s', level, this.maxVolume, this.zoneName);
+        this.brightness = this.maxBrightness;
+        this.log('Volume %s capped to max volume %s', level, this.maxBrightness);
+    } else {
+        this.brightness = level
     }
 
-    mqttClient.publish("/dimmer/brightness", level)
+    this.log('Publishing level %s', String(newBrightness));
+
+    if (mqttClient) {
+        mqttClient.publish("/dimmer/brightness", String(newBrightness));
+    } else {
+        this.log('MQTT client not ready');
+    }
+
+    // null, brightness = no result
+    this.log('callback()');
+    callback(); // first would be error
 }
 
 Dimmer.prototype.getBrightness = function(callback) {
     // ESP has no getter, sends by 30 sec and by change
-    callback(null, brightness);
+    this.log('getBrightness callback(null, '+this.brightness+')');
+    callback(null, this.brightness);
     /*
-    this.getStatus(function(status) {
-        var volume = parseInt(status.MasterVolume[0].value[0]) + 80;
-        callback(null, volume);
+    this.getBrightness(function(status) {
+        var brightness = parseInt(status);
+        callback(null, brightness);
     }.bind(this));
     */
 }

@@ -1,3 +1,3 @@
-wifi_ssid = '<wifi-ssid>'
-wifi_password = '<wifi-password>'
-mqtt_broker = '<mqtt-broker-ip>'
+wifi_ssid = '<ssid>'
+wifi_password = '<password>'
+mqtt_broker = '192.168.1.21'
