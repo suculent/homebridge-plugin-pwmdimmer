@@ -1,0 +1,18 @@
+{
+  "bridge" : {
+    "name" : "Homebridge",
+    "username" : "CC:22:3D:E3:CE:32",
+    "port" : 51826,
+    "pin" : "031-45-155"
+  },
+  "accessories" : [
+    {
+      "accessory" : "Dimmer",
+      "name" : "LED Stripe",
+      "description" : "ESP8266 MQTT PWM dimmer",
+      "max_brightness" : 100,
+      "mqtt_broker" : "192.168.1.21",
+      "mqtt_channel " : "/dimmer"
+    }
+  ]
+}
