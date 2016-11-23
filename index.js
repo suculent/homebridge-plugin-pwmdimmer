@@ -14,8 +14,6 @@ var default_mqtt_channel = "/dimmer"
 var mqtt = require('mqtt')
 var mqttClient = null; // will be non-null if working
 
-
-
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
@@ -30,7 +28,7 @@ function Dimmer(log, config) {
     this.mqttBroker = config['mqtt_broker'];
     this.mqttChannel = config['mqtt_channel'];
 
-    this.brightness = 0;
+    this.brightness = 0; // consider enabled by default, set -1 on failure.
 
     if (!this.mqttBroker) {
         this.log.warn('Config is missing mqtt_broker, fallback to default.');        
@@ -59,6 +57,18 @@ function init_mqtt(broker_address, channel) {
       mqttClient.subscribe(channel + "/dimmer")
     })
 
+    mqttClient.on('error', function () {
+      console.log("MQTT connected, subscribing to: " + channel)
+      mqttClient.subscribe(channel + "/dimmer")
+      this.brightness = -1
+    })
+
+    mqttClient.on('offline', function () {
+      console.log("MQTT connected, subscribing to: " + channel)
+      mqttClient.subscribe(channel + "/dimmer")
+      this.brightness = -1
+    })
+
     mqttClient.on('message', function (topic, message) {
       console.log("message: " + message.toString())
 
@@ -77,8 +87,33 @@ function init_mqtt(broker_address, channel) {
     })
   }
 
-Dimmer.prototype.setBrightness = function(level, callback) {
+// Keeps brightness
+Dimmer.prototype.setPowerState = function(powerOn, callback, context) {
+    this.log('setPowerState: %s', String(powerOn));
+    if(context !== 'fromSetValue') {        
+        if (mqttClient) {  
+            if (powerOn) {
+                mqttClient.publish("/dimmer/brightness", String(this.brightness));
+            } else {
+                mqttClient.publish("/dimmer/brightness", String(0));
+            }              
+            callback(null);
+        }    
+    }
+}
 
+Dimmer.prototype.getPowerState = function(callback) {
+    this.log('getPowerState callback(null, '+this.brightness+')');
+    var status = 0
+    if (this.brightness > 0) {
+        callback(null, 1);
+    } else {
+        callback(null, 0);
+    }
+}
+
+Dimmer.prototype.setBrightness = function(level, callback) {
+    this.log('setBrightness: %s', String(level));
     if(level > this.maxBrightness){
         //enforce maximum volume
         this.brightness = this.maxBrightness;
@@ -86,25 +121,21 @@ Dimmer.prototype.setBrightness = function(level, callback) {
     } else {
         this.brightness = level
     }
-
-    this.log('Publishing level %s', String(newBrightness));
-
+    this.log('setBrightness: %s', String(this.brightness));
     if (mqttClient) {
-        mqttClient.publish("/dimmer/brightness", String(newBrightness));
+        mqttClient.publish("/dimmer/brightness", String(this.brightness));
     } else {
         this.log('MQTT client not ready');
     }
-
-    // null, brightness = no result
-    this.log('callback()');
-    callback(); // first would be error
+    this.log('callback(null)');
+    callback(null);
 }
 
 Dimmer.prototype.getBrightness = function(callback) {
     // ESP has no getter, sends by 30 sec and by change
     this.log('getBrightness callback(null, '+this.brightness+')');
     callback(null, this.brightness);
-    /*
+    /* async would be:
     this.getBrightness(function(status) {
         var brightness = parseInt(status);
         callback(null, brightness);
@@ -113,12 +144,24 @@ Dimmer.prototype.getBrightness = function(callback) {
 }
 
 Dimmer.prototype.getServices = function() {
+
     var lightbulbService = new Service.Lightbulb(this.name);
+    var informationService = new Service.AccessoryInformation();
+
+    informationService
+      .setCharacteristic(Characteristic.Manufacturer, "Page 42")
+      .setCharacteristic(Characteristic.Model, "LED Dimmer")
+      .setCharacteristic(Characteristic.SerialNumber, "2");
+
+    lightbulbService
+      .getCharacteristic(Characteristic.On)
+      .on('get', this.getPowerState.bind(this))
+      .on('set', this.setPowerState.bind(this));
 
     lightbulbService
         .addCharacteristic(new Characteristic.Brightness())
         .on('get', this.getBrightness.bind(this))
-        .on('set', this.setBrightness.bind(this));
+        .on('set', this.setBrightness.bind(this));        
 
-    return [lightbulbService];
+    return [lightbulbService, informationService];
 }
