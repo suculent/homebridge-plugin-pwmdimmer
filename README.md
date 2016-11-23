@@ -14,6 +14,11 @@ Checkout/download/unzip/whatever:
     
     # Install this npm package globally
     npm install -g .
+    
+Upload files from esp8266/ folder to your ESP using ESPTool or any other tool you prefer.
+
+    init.lua - bootloader with couple seconds to interrupt after power-on
+    application.lua - app that gets executed after given power-on timeout
 
 Add Homebridge accessory to ~/homebridge/config.json:
     

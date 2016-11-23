@@ -1,8 +1,8 @@
 dofile("config.lua")  -- defines ssid, password and mqtt broker IP
 
-pin = 4 -- !!! do not attach this pin 4 (gpio02) on reset, use another pin instead. anything is better than this. !!!
+pin = 3 -- !!! do not attach this pin 4 (gpio02) on reset, use another pin instead. anything is better than this. !!!
 duty = 1 -- from interval 1..1023
-maxDuty = 511 -- from interval 1..1023
+maxDuty = 510 -- from interval 1..1023
 repeats = 2 -- for testing
 clock = 1000 -- from interval 1..1000
 
@@ -48,8 +48,8 @@ function mq(target)
         print ("connected") 
     end)
     m:on("offline", function(client) 
-        print ("offline") 
-        m:close();        
+        print ("offline")
+        if m ~= nil then m:close(); end
         connect(wifi_ssid, wifi_password)
     end)
 
@@ -57,8 +57,8 @@ function mq(target)
         if data ~= nil then fadeToPercent(data) end
     end)
 
-    print("Connecting to MQTT to " .. target .. "...")
-    m:connect(target, 1883, 0,
+    print("Connecting to MQTT to " .. mqtt_broker .. "...")
+    m:connect(mqtt_broker, 1883, 0,
     function(client)
         print(":mconnected") 
         m:subscribe("/dimmer/brightness",0, function(client) print("subscribe success") end)
@@ -83,12 +83,13 @@ function fadeToPercent(percent)
     percent = tonumber(percent)
     local continue = true
     local targetDuty = maxDuty * percent / 100
-    -- print("targetDuty " .. targetDuty)
+    print("startDuty " .. duty)
+    print("targetDuty " .. targetDuty)
 
-    if percent == currentPercent then
+    if duty == targetDuty then
         direction = 0
     else
-        if percent > currentPercent then
+        if targetDuty > duty then
             direction = 1
         else
             direction = -1
@@ -96,19 +97,25 @@ function fadeToPercent(percent)
     end
 
     while continue do
-        tmr.delay(100)
+        tmr.delay(100)        
         pwm.setup(pin, clock, duty)
         pwm.start(pin)    
         duty = duty + direction               
-        -- print(duty) -- causes significant delay
+        
+        if duty == maxDuty then
+            continue = false -- clamp to max
+            print("clampDuty " .. duty)
+        end
+        -- print(duty) -- causes significant delay (cca 100ms)
         if duty == targetDuty then
             currentPercent = percent                      
             continue = false
+            print("endDuty " .. duty)
         end        
     end
     
     if m == 0 then
-        -- no publish channel
+        --
     else
         m:publish("/dimmer",currentPercent,0,0)
     end  
@@ -116,4 +123,5 @@ function fadeToPercent(percent)
 end
 
 -- main
+dofile("config.lua") -- load ssid, password and mqtt_broker
 connect(wifi_ssid, wifi_password)
