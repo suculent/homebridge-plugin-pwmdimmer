@@ -1,5 +1,7 @@
 # homebridge-plugin-pwmdimmer
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/suculent/homebridge-plugin-pwmdimmer.svg)](https://greenkeeper.io/)
+
 Have your ESP-based PWM Brightness controller as a HomeKit accessory on your iOS device.
 
 ## TL;DR
